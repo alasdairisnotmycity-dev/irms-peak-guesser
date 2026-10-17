@@ -1,0 +1,1799 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IRMS Peak Guesser - Analytical Instrument Simulator</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts: Inter & JetBrains Mono -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    },
+                    colors: {
+                        slate: {
+                            850: '#0f172a',
+                            925: '#090d16',
+                            950: '#040711'
+                        },
+                        irms: {
+                            ref: '#06b6d4',      /* Cyan for Reference Gas */
+                            sample: '#10b981',   /* Emerald for Sample */
+                            warning: '#f59e0b',  /* Amber */
+                            danger: '#ef4444',   /* Rose */
+                            grid: '#1e293b',
+                            trace: '#38bdf8'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* Theme Variables for Seamless Light & Dark Mode */
+        :root[data-theme="dark"] {
+            --bg-app: #040711;
+            --bg-header: rgba(15, 23, 42, 0.92);
+            --bg-card: #0f172a;
+            --bg-subcard: rgba(4, 7, 17, 0.65);
+            --bg-strip: #090d16;
+            --bg-canvas: #040711;
+            --bg-control: #1e293b;
+            --bg-control-hover: #334155;
+            --bg-overlay: rgba(15, 23, 42, 0.88);
+            --border-main: #1e293b;
+            --border-subtle: rgba(30, 41, 59, 0.8);
+            --text-primary: #f1f5f9;
+            --text-secondary: #cbd5e1;
+            --text-muted: #94a3b8;
+            --text-dim: #64748b;
+            --accent-cyan: #22d3ee;
+            --accent-emerald: #34d399;
+            --accent-amber: #fbbf24;
+            --shadow-glow: 0 0 15px -3px rgba(56, 189, 248, 0.2);
+        }
+
+        :root[data-theme="light"] {
+            --bg-app: #f1f5f9;
+            --bg-header: rgba(255, 255, 255, 0.94);
+            --bg-card: #ffffff;
+            --bg-subcard: #f8fafc;
+            --bg-strip: #f1f5f9;
+            --bg-canvas: #ffffff;
+            --bg-control: #e2e8f0;
+            --bg-control-hover: #cbd5e1;
+            --bg-overlay: rgba(255, 255, 255, 0.92);
+            --border-main: #cbd5e1;
+            --border-subtle: #e2e8f0;
+            --text-primary: #0f172a;
+            --text-secondary: #1e293b;
+            --text-muted: #475569;
+            --text-dim: #64748b;
+            --accent-cyan: #0891b2;
+            --accent-emerald: #059669;
+            --accent-amber: #d97706;
+            --shadow-glow: 0 10px 25px -5px rgba(15, 23, 42, 0.08);
+        }
+
+        body {
+            background-color: var(--bg-app);
+            color: var(--text-primary);
+            transition: background-color 0.25s ease, color 0.25s ease;
+        }
+
+        .theme-header {
+            background-color: var(--bg-header);
+            border-color: var(--border-main);
+        }
+
+        .theme-card {
+            background-color: var(--bg-card);
+            border-color: var(--border-main);
+        }
+
+        .theme-subcard {
+            background-color: var(--bg-subcard);
+            border-color: var(--border-subtle);
+        }
+
+        .theme-strip {
+            background-color: var(--bg-strip);
+            border-color: var(--border-subtle);
+        }
+
+        .theme-canvas-wrap {
+            background-color: var(--bg-canvas);
+        }
+
+        .theme-control {
+            background-color: var(--bg-control);
+            border-color: var(--border-main);
+            color: var(--text-secondary);
+        }
+        .theme-control:hover:not(:disabled) {
+            background-color: var(--bg-control-hover);
+        }
+
+        .theme-overlay {
+            background-color: var(--bg-overlay);
+            border-color: var(--border-main);
+        }
+
+        .theme-text-primary { color: var(--text-primary); }
+        .theme-text-secondary { color: var(--text-secondary); }
+        .theme-text-muted { color: var(--text-muted); }
+        .theme-text-dim { color: var(--text-dim); }
+        .theme-text-cyan { color: var(--accent-cyan); }
+        .theme-text-emerald { color: var(--accent-emerald); }
+        .theme-text-amber { color: var(--accent-amber); }
+
+        .glow-accent { box-shadow: var(--shadow-glow); }
+
+        /* Custom scrollbar */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: var(--bg-app); }
+        ::-webkit-scrollbar-thumb { background: var(--border-main); border-radius: 4px; }
+    </style>
+</head>
+<body class="font-sans min-h-screen flex flex-col antialiased selection:bg-cyan-500 selection:text-black">
+
+    <!-- Top Instrument Header Bar -->
+    <header class="theme-header border-b backdrop-blur sticky top-0 z-40 px-4 lg:px-8 py-3 flex items-center justify-between shadow-sm">
+        <div class="flex items-center gap-3">
+            <div class="relative flex items-center justify-center w-9 h-9 rounded-lg bg-cyan-950 border border-cyan-500/40 text-cyan-400 font-mono font-bold shadow-inner text-sm">
+                <span>δ</span>
+                <span class="absolute -top-1 -right-1 flex h-2.5 w-2.5">
+                    <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                    <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+                </span>
+            </div>
+            <div>
+                <div class="flex items-center gap-2">
+                    <h1 class="text-base font-bold tracking-tight theme-text-primary flex items-center gap-1.5">
+                        IRMS <span class="text-cyan-500 font-mono font-semibold text-xs px-1.5 py-0.5 rounded bg-cyan-500/10 border border-cyan-500/30">ISO-ESTIMATE v2.5</span>
+                    </h1>
+                </div>
+                <p class="text-[11px] theme-text-muted font-mono tracking-wide hidden sm:block">ISOTOPE RATIO MASS SPECTROMETRY · PEAK INTEGRATION TRAINER</p>
+            </div>
+        </div>
+
+        <!-- Central Quick Telemetry -->
+        <div class="hidden xl:flex items-center gap-4 font-mono text-xs">
+            <div class="flex items-center gap-2 px-3 py-1.5 rounded-md theme-subcard border">
+                <span class="theme-text-muted">ION SOURCE:</span>
+                <span class="theme-text-emerald font-semibold flex items-center gap-1">
+                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> 200°C / EI ON
+                </span>
+            </div>
+            <div class="flex items-center gap-2 px-3 py-1.5 rounded-md theme-subcard border">
+                <span class="theme-text-muted">COLLECTOR:</span>
+                <span id="channelIndicator" class="theme-text-cyan font-semibold tracking-wider">m/z 44 (MAJOR)</span>
+            </div>
+            <button id="headerPpeBadgeBtn" title="Click to view UK HSE / COSHH Risk Assessment & PPE status" class="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/40 theme-text-amber font-semibold transition">
+                <span id="headerPpeDot" class="w-1.5 h-1.5 rounded-full bg-amber-500 animate-ping"></span>
+                <span id="headerPpeText">COSHH & PPE: Pending Sign-Off</span>
+            </button>
+        </div>
+
+        <!-- Right Side Utility Controls -->
+        <div class="flex items-center gap-2 sm:gap-2.5">
+            <!-- Theme Toggle Button (Light / Dark Mode) -->
+            <button id="themeToggleBtn" class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg theme-control border text-xs font-mono transition-all" title="Switch between Dark and Light mode">
+                <span id="themeIcon">☀️</span>
+                <span id="themeLabel" class="hidden sm:inline">Light Mode</span>
+            </button>
+
+            <button id="soundToggleBtn" class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg theme-control border text-xs font-mono transition-all">
+                <span id="soundIcon">🔊</span>
+                <span id="soundLabel" class="hidden md:inline">SFX ON</span>
+            </button>
+
+            <button id="openManualBtn" class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-cyan-500/15 hover:bg-cyan-500/25 border border-cyan-500/40 text-xs font-medium theme-text-cyan transition-all">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path></svg>
+                <span>Lab Protocol</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Container -->
+    <main class="flex-1 max-w-7xl w-full mx-auto p-3 sm:p-5 lg:p-6 flex flex-col gap-5">
+        
+        <!-- Scoreboard & Session Telemetry Row -->
+        <section class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-3">
+            <div class="theme-card border rounded-xl p-3 flex flex-col justify-between shadow-sm">
+                <span class="text-[11px] font-mono theme-text-muted uppercase tracking-wider">Score</span>
+                <div class="flex items-baseline gap-1 mt-1">
+                    <span id="scoreDisplay" class="text-2xl font-bold font-mono theme-text-primary tracking-tight">0</span>
+                    <span class="text-xs theme-text-dim font-mono">pts</span>
+                </div>
+            </div>
+            <div class="theme-card border rounded-xl p-3 flex flex-col justify-between shadow-sm">
+                <span class="text-[11px] font-mono theme-text-muted uppercase tracking-wider">Acquisition Run</span>
+                <div class="flex items-baseline gap-1 mt-1">
+                    <span id="roundDisplay" class="text-2xl font-bold font-mono theme-text-cyan">0</span>
+                    <span id="totalRoundsDisplay" class="text-xs theme-text-dim font-mono">/ 5</span>
+                </div>
+            </div>
+            <div class="theme-card border rounded-xl p-3 flex flex-col justify-between shadow-sm">
+                <span class="text-[11px] font-mono theme-text-muted uppercase tracking-wider">Streak</span>
+                <div class="flex items-baseline gap-1 mt-1">
+                    <span id="streakDisplay" class="text-2xl font-bold font-mono theme-text-amber">0</span>
+                    <span class="text-xs theme-text-dim font-mono">combo</span>
+                </div>
+            </div>
+            <div class="theme-card border rounded-xl p-3 flex flex-col justify-between shadow-sm">
+                <span class="text-[11px] font-mono theme-text-muted uppercase tracking-wider">Avg Error</span>
+                <div class="flex items-baseline gap-1 mt-1">
+                    <span id="avgErrorDisplay" class="text-2xl font-bold font-mono theme-text-secondary">--</span>
+                    <span class="text-xs theme-text-dim font-mono">%</span>
+                </div>
+            </div>
+            <div class="theme-card border rounded-xl p-3 flex flex-col justify-between col-span-2 shadow-sm">
+                <div class="flex items-center justify-between">
+                    <span class="text-[11px] font-mono theme-text-muted uppercase tracking-wider">Record High Score & Rank</span>
+                    <button id="resetRecordBtn" class="text-[10px] theme-text-dim hover:underline font-mono">Reset</button>
+                </div>
+                <div class="flex flex-wrap items-baseline justify-between gap-2 mt-1">
+                    <div class="flex items-baseline gap-1">
+                        <span id="highScoreDisplay" class="text-2xl font-bold font-mono theme-text-emerald">0</span>
+                        <span class="text-xs theme-text-dim font-mono">pts</span>
+                    </div>
+                    <span id="ratingBadge" class="text-[11px] font-mono font-semibold px-2 py-0.5 rounded theme-control border">GCSE Chemistry Student</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- Main Workspace (Chromatogram Display + Controls) -->
+        <section class="grid grid-cols-1 lg:grid-cols-12 gap-5 flex-1">
+            
+            <!-- Left / Center: Chromatogram Canvas Screen (Col 8) -->
+            <div class="lg:col-span-8 flex flex-col theme-card border rounded-2xl overflow-hidden shadow-xl relative glow-accent">
+                
+                <!-- Monitor Top Control Ribbon -->
+                <div class="theme-strip border-b px-4 py-2.5 flex flex-wrap items-center justify-between gap-3 text-xs">
+                    <div class="flex items-center gap-2">
+                        <span class="w-2.5 h-2.5 rounded-full bg-cyan-500 animate-pulse"></span>
+                        <span class="font-mono theme-text-secondary font-semibold">LIVE CHROMATOGRAM VIEW</span>
+                    </div>
+
+                    <!-- Difficulty Tiers & Collector Selector -->
+                    <div class="flex flex-wrap items-center gap-2 font-mono">
+                        <label for="difficultySelect" class="theme-text-muted text-[11px]">DIFFICULTY:</label>
+                        <select id="difficultySelect" class="theme-control border rounded px-2 py-1 text-xs focus:ring-1 focus:ring-cyan-500 focus:outline-none">
+                            <option value="1">L1: Ideal Baseline (Gaussian)</option>
+                            <option value="2" selected>L2: Real Tailing (EMG + Drift)</option>
+                            <option value="3">L3: Noisy & Co-elution Stress</option>
+                        </select>
+                        <button id="toggleCollectorBtn" title="Toggle Collector Zoom/Gain" class="theme-control border rounded px-2.5 py-1 text-xs font-semibold theme-text-cyan transition">
+                            Collector: m/z 44
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Canvas Wrapper -->
+                <div id="canvasContainer" class="relative flex-1 w-full min-h-[370px] md:min-h-[430px] theme-canvas-wrap overflow-hidden cursor-crosshair">
+                    <canvas id="chromatogramCanvas" class="w-full h-full block"></canvas>
+
+                    <div id="standbyOverlay" class="absolute inset-0 z-10 flex items-center justify-center p-6 pointer-events-none">
+                        <div class="theme-overlay border-2 border-dashed border-amber-500/40 rounded-2xl p-5 max-w-md w-full text-center shadow-2xl backdrop-blur-md pointer-events-auto space-y-3" id="standbyCard">
+                            <div id="standbyIcon" class="w-11 h-11 rounded-xl bg-amber-500/15 border border-amber-500/40 theme-text-amber flex items-center justify-center mx-auto text-xl font-mono">
+                                ⚠️
+                            </div>
+                            <h3 id="standbyTitle" class="text-sm font-bold font-mono theme-text-primary uppercase tracking-wide">
+                                Instrument Standby · Safety Interlock Active
+                            </h3>
+                            <p id="standbyDesc" class="text-xs theme-text-secondary leading-relaxed">
+                                Mandatory <strong>UK COSHH Risk Assessment & PPE Sign-Off</strong> is required before opening the reference gas valves or injecting your first sample.
+                            </p>
+                            <div class="pt-1 flex flex-wrap items-center justify-center gap-2">
+                                <button id="standbyOpenProtocolBtn" type="button" class="px-3.5 py-2 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-mono font-bold text-xs transition shadow">
+                                    Open Lab Protocol & Sign Off PPE
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Interactive & Draggable Top-Right Signal Legend Box -->
+                    <div id="signalLegendBox" class="absolute top-3 right-3 z-20 flex flex-col font-mono text-[11px] theme-overlay backdrop-blur-md rounded-xl border shadow-lg select-none w-56 transition-shadow">
+                        <!-- Drag Handle Header -->
+                        <div id="legendDragHandle" class="flex items-center justify-between px-3 py-1.5 border-b border-slate-500/20 cursor-move rounded-t-xl bg-slate-500/10 hover:bg-slate-500/15 transition" title="Drag to reposition Signal Legend anywhere on the monitor">
+                            <div class="flex items-center gap-1.5">
+                                <span class="theme-text-dim text-xs leading-none">⠿</span>
+                                <span class="text-[10px] font-bold uppercase tracking-wider theme-text-secondary">Signal Legend</span>
+                            </div>
+                            <div class="flex items-center gap-1">
+                                <span class="text-[9px] theme-text-dim uppercase">Drag</span>
+                                <button id="legendCollapseBtn" type="button" class="w-4 h-4 flex items-center justify-center rounded hover:bg-slate-500/20 theme-text-secondary font-bold text-xs leading-none" title="Collapse or expand legend">−</button>
+                            </div>
+                        </div>
+
+                        <!-- Legend Body (3 Interactive Items, Analyte Sample Peak Removed) -->
+                        <div id="legendBody" class="flex flex-col gap-1.5 px-3 py-2">
+                            <button type="button" data-layer="ref" class="legend-toggle-row flex items-center justify-between gap-2 text-left hover:opacity-80 transition py-0.5" title="Click to toggle Reference Gas highlight">
+                                <div class="flex items-center gap-2">
+                                    <span class="w-3 h-3 rounded-sm bg-cyan-500/80 border border-cyan-400 inline-block shrink-0"></span>
+                                    <span class="theme-text-secondary">Ref Gas Pulse (<span id="legendRefArea" class="font-bold theme-text-cyan">40.0 V/ms</span>)</span>
+                                </div>
+                                <span class="layer-state text-[9px] theme-text-emerald font-bold">ON</span>
+                            </button>
+                            <button type="button" data-layer="trace" class="legend-toggle-row flex items-center justify-between gap-2 text-left hover:opacity-80 transition py-0.5" title="Click to toggle Active Collector Ion Trace">
+                                <div class="flex items-center gap-2">
+                                    <span id="legendTraceSwatch" class="w-3 h-0.5 bg-sky-400 inline-block shrink-0"></span>
+                                    <span id="legendTraceLabel" class="theme-text-muted">m/z 44 Major Ion Trace</span>
+                                </div>
+                                <span class="layer-state text-[9px] theme-text-emerald font-bold">ON</span>
+                            </button>
+                            <button type="button" data-layer="baseline" class="legend-toggle-row flex items-center justify-between gap-2 text-left hover:opacity-80 transition py-0.5" title="Click to toggle Integration Baseline">
+                                <div class="flex items-center gap-2">
+                                    <span class="w-3 h-0.5 border-b border-dashed border-slate-400 inline-block shrink-0"></span>
+                                    <span class="theme-text-muted">Integration Baseline</span>
+                                </div>
+                                <span class="layer-state text-[9px] theme-text-emerald font-bold">ON</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Overlay Tooltip for Cursor Hover (Faraday Cup Readout) -->
+                    <div id="canvasTooltip" class="absolute pointer-events-none hidden theme-overlay border font-mono text-[11px] px-2.5 py-1.5 rounded-md shadow-xl backdrop-blur z-20">
+                        <div class="theme-text-secondary">RT: <span id="tooltipRt" class="theme-text-cyan font-bold">0.0</span> s</div>
+                        <div class="theme-text-secondary">Beam: <span id="tooltipInt" class="theme-text-emerald font-bold">0.00</span> V</div>
+                    </div>
+                </div>
+
+                <!-- Monitor Bottom Diagnostics Status Strip -->
+                <div class="theme-strip border-t px-4 py-2 flex flex-wrap items-center justify-between text-[11px] font-mono theme-text-muted">
+                    <div class="flex items-center gap-4">
+                        <span>P_vacuum: <span class="theme-text-secondary font-semibold">1.2 × 10⁻⁷ mbar</span></span>
+                        <span>Baseline Noise: <span id="baselineNoiseStat" class="theme-text-secondary font-semibold">±0.04 V</span></span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <span id="evalStatusBadge" class="theme-text-muted italic">Awaiting integration estimate...</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right: Estimation Control Console (Col 4) -->
+            <div class="lg:col-span-4 flex flex-col gap-4">
+                
+                <!-- Prediction & Submission Card -->
+                <div class="theme-card border rounded-2xl p-5 shadow-xl flex flex-col justify-between">
+                    <div>
+                        <div class="flex items-center justify-between mb-3">
+                            <h2 class="text-sm font-semibold tracking-wide uppercase font-mono theme-text-cyan">Estimation Console</h2>
+                            <div class="flex items-center gap-1.5 bg-cyan-500/10 border border-cyan-500/30 px-2.5 py-1 rounded-md">
+                                <span class="text-[11px] font-mono theme-text-muted">Ref Area:</span>
+                                <span id="refStandardBadge" class="text-xs font-mono font-bold theme-text-cyan">40.0 V/ms</span>
+                            </div>
+                        </div>
+
+                        <p class="text-xs theme-text-secondary leading-relaxed mb-4">
+                            Study the <strong>Reference Gas Pulse</strong> (<span id="promptRefValue" class="font-mono font-semibold theme-text-cyan">40.0 V/ms</span>) and estimate the integrated area of the <strong>Analyte Sample Peak</strong> in <span class="font-mono font-semibold">V/ms</span>. Remember: area scales with <em class="theme-text-cyan">beam height × peak width</em>!
+                        </p>
+
+                        <!-- Input Controls Area -->
+                        <div class="theme-subcard rounded-xl p-4 border mb-4">
+                            <div class="flex items-center justify-between mb-2">
+                                <label for="numInput" class="text-xs font-mono theme-text-secondary font-medium">Your Estimate (V/ms):</label>
+                                <span id="relativeMultiplierBadge" class="text-xs font-mono theme-text-emerald font-bold bg-emerald-500/10 border border-emerald-500/30 px-2 py-0.5 rounded">
+                                    1.00× Ref
+                                </span>
+                            </div>
+
+                            <div class="flex items-center gap-2.5 mb-4">
+                                <input id="numInput" type="number" min="1.0" max="250.0" step="0.1" value="40.0" 
+                                    class="w-full theme-card border focus:border-cyan-500 theme-text-primary font-mono text-xl font-bold px-3 py-2 rounded-lg focus:outline-none focus:ring-1 focus:ring-cyan-500 transition" />
+                                <span class="theme-text-muted font-mono font-bold text-sm shrink-0">V/ms</span>
+                            </div>
+
+                            <!-- Range slider in V/ms -->
+                            <div class="space-y-1">
+                                <input id="rangeSlider" type="range" min="2.0" max="180.0" step="0.1" value="40.0" 
+                                    class="w-full accent-cyan-500 cursor-pointer h-2 bg-slate-500/30 rounded-lg">
+                                <div class="flex justify-between text-[10px] font-mono theme-text-dim">
+                                    <span>2.0 V/ms</span>
+                                    <span id="sliderMidLabel">60.0 V/ms</span>
+                                    <span>120.0 V/ms</span>
+                                    <span>180.0 V/ms</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Quick Reference Multiplier Presets (auto-calculates V/ms from current Ref peak) -->
+                        <div class="flex flex-wrap items-center gap-1.5 mb-5">
+                            <span class="text-[10px] font-mono theme-text-dim uppercase mr-1">Quick Ratio:</span>
+                            <button class="preset-btn px-2 py-1 rounded theme-control border text-[11px] font-mono transition" data-mult="0.5">0.5× Ref</button>
+                            <button class="preset-btn px-2 py-1 rounded theme-control border text-[11px] font-mono transition" data-mult="0.75">0.75× Ref</button>
+                            <button class="preset-btn px-2 py-1 rounded theme-control border text-[11px] font-mono transition" data-mult="1.0">1.0× Ref</button>
+                            <button class="preset-btn px-2 py-1 rounded theme-control border text-[11px] font-mono transition" data-mult="1.5">1.5× Ref</button>
+                            <button class="preset-btn px-2 py-1 rounded theme-control border text-[11px] font-mono transition" data-mult="2.0">2.0× Ref</button>
+                        </div>
+                    </div>
+
+                    <div class="space-y-2">
+                        <div id="ppeLockNotice" class="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/40 text-[11px] font-mono theme-text-amber flex items-center justify-between gap-2">
+                            <span>🔒 Sign off COSHH & PPE in <strong>Lab Protocol</strong> to unlock injection.</span>
+                            <button id="inlineOpenManualBtn" type="button" class="px-2 py-1 rounded bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 font-bold shrink-0 transition">Sign Off</button>
+                        </div>
+                        <button id="submitGuessBtn" disabled class="w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 disabled:opacity-40 text-slate-950 font-bold font-mono text-sm tracking-wide shadow-lg shadow-cyan-500/20 active:scale-[0.98] transition flex items-center justify-center gap-2">
+                            <span>INTEGRATE & SUBMIT (V/ms)</span>
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
+                        </button>
+                        <button id="nextPeakBtn" disabled class="w-full py-2.5 px-4 rounded-xl theme-control border disabled:opacity-40 font-mono text-xs font-semibold tracking-wider transition flex items-center justify-center gap-2">
+                            <span id="nextPeakBtnLabel">INJECT FIRST SAMPLE (START RUN 1)</span>
+                            <span class="text-xs">⏭</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Analysis / Result Card (Active after submit) -->
+                <div id="resultCard" class="theme-card border rounded-2xl p-4 shadow-xl transition-all duration-300 hidden">
+                    <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-500/20 pb-2 mb-3">
+                        <span class="text-xs font-mono font-semibold theme-text-secondary">DATA AUDIT SUMMARY</span>
+                        <span id="gradeBadge" class="text-xs font-mono font-bold px-2.5 py-0.5 rounded bg-cyan-500/15 theme-text-cyan border border-cyan-500/30">Lab Manager</span>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-2 text-xs font-mono mb-3">
+                        <div class="theme-subcard p-2.5 rounded-lg border">
+                            <div class="theme-text-dim text-[10px]">YOUR ESTIMATE</div>
+                            <div id="resUserGuess" class="theme-text-primary text-base font-bold">67.3 V/ms</div>
+                        </div>
+                        <div class="theme-subcard p-2.5 rounded-lg border">
+                            <div class="theme-text-dim text-[10px]">TRUE SAMPLE AREA</div>
+                            <div id="resTrueArea" class="theme-text-emerald text-base font-bold">65.8 V/ms</div>
+                        </div>
+                        <div class="theme-subcard p-2.5 rounded-lg border">
+                            <div class="theme-text-dim text-[10px]">RELATIVE ERROR</div>
+                            <div id="resErrorPct" class="theme-text-amber text-base font-bold">2.28%</div>
+                        </div>
+                        <div class="theme-subcard p-2.5 rounded-lg border">
+                            <div class="theme-text-dim text-[10px]">ROUND SCORE</div>
+                            <div id="resRoundScore" class="theme-text-cyan text-base font-bold">+93 pts</div>
+                        </div>
+                    </div>
+
+                    <p id="feedbackNarrative" class="text-xs theme-text-secondary theme-subcard p-2.5 rounded-lg border leading-relaxed font-sans"></p>
+                </div>
+
+            </div>
+        </section>
+
+        <!-- Round Complete Game Over Modal (Hidden by default) -->
+        <div id="gameOverModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center p-4 hidden">
+            <div class="theme-card border max-w-md w-full rounded-2xl p-6 shadow-2xl relative text-center">
+                <div class="w-14 h-14 rounded-2xl bg-cyan-500/15 border border-cyan-500/40 theme-text-cyan flex items-center justify-center mx-auto mb-4 text-2xl font-mono shadow-lg">
+                    🧪
+                </div>
+                <h3 class="text-xl font-bold font-mono theme-text-primary mb-1">Acquisition Sequence Complete</h3>
+                <p class="text-xs theme-text-muted font-mono mb-4">5-ROUND IRMS INTEGRATION REPORT</p>
+
+                <div class="theme-subcard rounded-xl p-4 border mb-5 text-left font-mono space-y-2.5 text-xs">
+                    <div class="flex justify-between border-b border-slate-500/20 pb-1.5">
+                        <span class="theme-text-muted">Total Run Score:</span>
+                        <span id="modalFinalScore" class="theme-text-primary font-bold text-sm">450 pts</span>
+                    </div>
+                    <div class="flex justify-between border-b border-slate-500/20 pb-1.5">
+                        <span class="theme-text-muted">Average Absolute Error:</span>
+                        <span id="modalFinalAvgErr" class="theme-text-emerald font-bold text-sm">3.4%</span>
+                    </div>
+                    <div class="flex justify-between border-b border-slate-500/20 pb-1.5">
+                        <span class="theme-text-muted">Precision Streak:</span>
+                        <span id="modalFinalStreak" class="theme-text-amber font-bold text-sm">3</span>
+                    </div>
+                    <div class="flex justify-between items-center pt-1">
+                        <span class="theme-text-muted">Assigned Lab Rank:</span>
+                        <span id="modalFinalRank" class="theme-text-cyan font-bold bg-cyan-500/15 px-2.5 py-0.5 rounded border border-cyan-500/30">Lab Manager</span>
+                    </div>
+                </div>
+
+                <div class="flex gap-3">
+                    <button id="modalPlayAgainBtn" class="flex-1 py-3 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold font-mono text-xs tracking-wider transition">
+                        START NEW SEQUENCE
+                    </button>
+                    <button id="modalCloseBtn" class="px-4 py-3 rounded-xl theme-control border font-mono text-xs transition">
+                        CLOSE
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Educational / Lab Manual Protocol Modal -->
+        <div id="manualModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center p-4 hidden">
+            <div class="theme-card border max-w-2xl w-full max-h-[88vh] rounded-2xl p-6 shadow-2xl relative flex flex-col">
+                <div class="flex items-center justify-between border-b border-slate-500/20 pb-3 mb-4">
+                    <div class="flex items-center gap-2">
+                        <span class="theme-text-cyan font-mono font-bold text-lg">§</span>
+                        <h3 class="text-base font-bold theme-text-primary font-mono">Standard Operating Procedure: IRMS Peak Integration & UK Safety</h3>
+                    </div>
+                    <button id="closeManualBtn" class="theme-text-muted hover:theme-text-primary text-xl font-mono leading-none">&times;</button>
+                </div>
+
+                <div class="flex-1 overflow-y-auto space-y-4 text-xs theme-text-secondary leading-relaxed pr-2">
+                    <!-- UK Lab Safety, COSHH Risk Assessment & PPE Notice -->
+                    <div class="p-4 rounded-xl border-2 border-amber-500/40 bg-amber-500/5 space-y-3">
+                        <div class="flex flex-wrap items-center justify-between gap-2 border-b border-amber-500/20 pb-2">
+                            <div class="flex items-center gap-2">
+                                <span class="text-base">⚠️</span>
+                                <h4 class="font-bold theme-text-amber font-mono uppercase tracking-wide">Mandatory UK Health & Safety, COSHH Risk Assessment & PPE Notice</h4>
+                            </div>
+                            <span id="modalPpeStatusBadge" class="text-[11px] font-mono font-bold px-2.5 py-0.5 rounded bg-emerald-500/15 theme-text-emerald border border-emerald-500/40">
+                                COSHH & PPE: Verified ✓
+                            </span>
+                        </div>
+
+                        <p>
+                            <strong>Statutory Framework:</strong> All isotope ratio mass spectrometry operations are governed by the <strong>UK Health and Safety at Work etc. Act 1974 (HSWA)</strong>, the <strong>Control of Substances Hazardous to Health Regulations 2002 (COSHH)</strong>, and <strong>DSEAR (Dangerous Substances and Explosive Atmospheres Regulations 2002)</strong> as enforced by the <strong>UK Health and Safety Executive (HSE)</strong>.
+                        </p>
+
+                        <p>
+                            <strong>Pre-Acquisition Risk Assessment (RA):</strong> Before opening any mass spectrometer reference gas isolation valves or starting an acquisition sequence, operators must verify that a signed Departmental Risk Assessment and COSHH Assessment are in place covering:
+                        </p>
+                        <ul class="list-disc list-inside space-y-1 pl-1 theme-text-secondary">
+                            <li><strong>High-Pressure Compressed Gas Cylinders:</strong> Carrier (He) and reference gases (CO₂, N₂, O₂) regulated under <strong>BCGA Code of Practice CP4</strong>.</li>
+                            <li><strong>High-Vacuum & High-Voltage Assemblies:</strong> Turbo-molecular vacuum pumps and ion source acceleration plates operating at up to 3–10 kV.</li>
+                            <li><strong>Cryogenic Liquid Nitrogen (LN₂) Cold Traps:</strong> Asphyxiation, oxygen-depletion, and severe cold-burn hazards during trap maintenance.</li>
+                        </ul>
+
+                        <div class="theme-card p-3 rounded-lg border space-y-1.5">
+                            <div class="font-mono font-bold theme-text-cyan text-[11px] uppercase tracking-wider">Mandatory UK Standard PPE Checklist (All Operators Must Wear):</div>
+                            <ul class="space-y-1 text-[11px]">
+                                <li>• <strong>Eye Protection (BS EN 166):</strong> Safety spectacles with lateral side shields (or chemical/cryogenic splash goggles where specified).</li>
+                                <li>• <strong>Protective Lab Coat (ISO 13688 / BS EN 14126):</strong> Full-length Howie-style or barrier laboratory coat, fully buttoned with elasticated cuffs.</li>
+                                <li>• <strong>Hand Protection (BS EN ISO 374 & BS EN 511):</strong> Nitrile disposable gloves for sample vial handling and insulated cryogenic gauntlets (BS EN 511) when filling LN₂ cold traps.</li>
+                                <li>• <strong>Footwear:</strong> Enclosed, non-slip laboratory footwear worn at all times inside the instrument bay.</li>
+                            </ul>
+                        </div>
+
+                        <div class="flex flex-wrap items-center justify-between gap-2 pt-1">
+                            <span class="text-[11px] font-mono theme-text-muted">Operator Safety Log Sign-Off:</span>
+                            <button id="togglePpeComplianceBtn" type="button" class="px-3 py-1.5 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/40 theme-text-emerald font-mono font-bold text-xs transition">
+                                ✓ Confirm COSHH Risk Assessment & PPE Compliance
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="theme-subcard p-3.5 rounded-xl border">
+                        <h4 class="font-bold theme-text-cyan font-mono mb-1">1. Physical Units: Why V/ms?</h4>
+                        <p>In Isotope Ratio Mass Spectrometry (EA-IRMS or GC-C-IRMS), ion beams are collected in Faraday cups and converted into voltage signals (Volts, V) over retention time. Integrating beam intensity across peak elution yields physical peak areas reported in <strong>V/ms</strong> (or V·s). Each run provides a Reference Gas standard pulse with a known integrated area (e.g., 40.0 V/ms).</p>
+                    </div>
+
+                    <div class="theme-subcard p-3.5 rounded-xl border">
+                        <h4 class="font-bold theme-text-emerald font-mono mb-1">2. Visual Area Estimation: Height × Width</h4>
+                        <p>Chromatographic peaks are not simple rectangles. For a Gaussian or tailed peak:</p>
+                        <div class="my-2 p-2 theme-card border rounded font-mono text-center theme-text-cyan font-semibold">
+                            Integrated Area (V/ms) ≈ Peak Height (V) × Width at Half Maximum (FWHM) × 1.064
+                        </div>
+                        <p><strong>Crucial Tip:</strong> A sharp analyte peak that is 2× taller than the reference pulse but half as wide has the <em>exact same area</em> in V/ms. Always inspect both peak crest voltage and base dispersion (τ)!</p>
+                    </div>
+
+                    <div class="theme-subcard p-3.5 rounded-xl border">
+                        <h4 class="font-bold theme-text-amber font-mono mb-1">3. Official Scoring Tiers & Career Progression</h4>
+                        <ul class="space-y-1.5 font-mono text-[11px] mt-2">
+                            <li class="flex items-center justify-between p-1.5 rounded bg-emerald-500/10 border border-emerald-500/30">
+                                <span class="font-bold theme-text-emerald">Tier 5: Lab Manager</span>
+                                <span>Error ≤ 2.0% (100 pts + 1.5× Bonus)</span>
+                            </li>
+                            <li class="flex items-center justify-between p-1.5 rounded bg-cyan-500/10 border border-cyan-500/30">
+                                <span class="font-bold theme-text-cyan">Tier 4: Junior Laboratory Technician</span>
+                                <span>Error ≤ 5.0% (85–99 pts + 1.2× Bonus)</span>
+                            </li>
+                            <li class="flex items-center justify-between p-1.5 rounded bg-sky-500/10 border border-sky-500/30">
+                                <span class="font-bold text-sky-400">Tier 3: Uni Student</span>
+                                <span>Error ≤ 12.0% (62–84 pts)</span>
+                            </li>
+                            <li class="flex items-center justify-between p-1.5 rounded bg-amber-500/10 border border-amber-500/30">
+                                <span class="font-bold theme-text-amber">Tier 2: A-Level Chemistry Student</span>
+                                <span>Error ≤ 20.0% (36–61 pts)</span>
+                            </li>
+                            <li class="flex items-center justify-between p-1.5 rounded bg-rose-500/10 border border-rose-500/30">
+                                <span class="font-bold text-rose-400">Tier 1: GCSE Chemistry Student</span>
+                                <span>Error &gt; 20.0% (Recalibration Needed)</span>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="pt-4 border-t border-slate-500/20 mt-2 flex justify-end">
+                    <button id="closeManualBtn2" class="px-4 py-2 rounded-lg bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold font-mono text-xs">
+                        UNDERSTOOD
+                    </button>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Synthetic Sound Engine (Web Audio API) -->
+    <script>
+        class SoundEngine {
+            constructor() {
+                this.ctx = null;
+                this.enabled = true;
+            }
+
+            init() {
+                if (!this.ctx) {
+                    const AudioContext = window.AudioContext || window.webkitAudioContext;
+                    this.ctx = new AudioContext();
+                }
+                if (this.ctx && this.ctx.state === 'suspended') {
+                    this.ctx.resume();
+                }
+            }
+
+            playBeep(freq = 600, duration = 0.08, type = 'sine') {
+                if (!this.enabled) return;
+                try {
+                    this.init();
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = type;
+                    osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
+                    gain.gain.setValueAtTime(0.08, this.ctx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.0001, this.ctx.currentTime + duration);
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    osc.start();
+                    osc.stop(this.ctx.currentTime + duration);
+                } catch(e) {
+                    console.warn("Audio Context blocked or unsupported", e);
+                }
+            }
+
+            playSuccess() {
+                if (!this.enabled) return;
+                this.playBeep(523.25, 0.09, 'sine'); // C5
+                setTimeout(() => this.playBeep(659.25, 0.09, 'sine'), 90); // E5
+                setTimeout(() => this.playBeep(783.99, 0.16, 'triangle'), 180); // G5
+            }
+
+            playWarning() {
+                if (!this.enabled) return;
+                this.playBeep(260, 0.12, 'sawtooth');
+                setTimeout(() => this.playBeep(220, 0.18, 'sawtooth'), 110);
+            }
+
+            playClick() {
+                this.playBeep(1200, 0.03, 'sine');
+            }
+        }
+        const sfx = new SoundEngine();
+    </script>
+
+    <!-- IRMS Simulation & Game Logic -->
+    <script>
+        // Game State
+        const state = {
+            theme: localStorage.getItem('irms_theme') || 'dark',
+            round: 0,
+            maxRounds: 5,
+            score: 0,
+            streak: 0,
+            highScore: parseInt(localStorage.getItem('irms_highscore') || '0', 10),
+            errorHistory: [],
+            difficulty: 2, // 1: Ideal, 2: EMG Tailing, 3: High Noise & Drift
+            sampleInjected: false,
+            revealed: false,
+            collectorMode: 'major', // 'major' (m/z 44) or 'minor' (m/z 45)
+            
+            // Peak parameters (Voltages in V, integrated areas in V/ms)
+            refPeak: {
+                rt: 100,      // seconds
+                height: 5.0,  // Volts (V)
+                sigma: 10,
+                area: 40.0,   // Specific physical value in V/ms (e.g. 40.0 V/ms)
+                color: '#06b6d4'
+            },
+            samplePeak: {
+                rt: 250,
+                height: 6.0,  // Volts (V)
+                sigma: 14,
+                tail: 0.2,
+                area: 55.4,   // True integrated area in V/ms
+                color: '#10b981'
+            },
+
+            // Chromatogram waveform samples
+            totalSeconds: 400,
+            sampleRate: 2, // 2 points per sec => 800 points
+            points: [],
+            baseline: [],
+
+            // Interactive Signal Legend Layer Visibility & UK Safety Compliance State
+            legendLayers: {
+                ref: true,
+                trace: true,
+                baseline: true
+            },
+            legendCollapsed: false,
+            ppeVerified: false
+        };
+
+        // DOM Elements
+        const canvasContainer = document.getElementById('canvasContainer');
+        const canvas = document.getElementById('chromatogramCanvas');
+        const ctx = canvas.getContext('2d');
+        const signalLegendBox = document.getElementById('signalLegendBox');
+        const legendDragHandle = document.getElementById('legendDragHandle');
+        const legendCollapseBtn = document.getElementById('legendCollapseBtn');
+        const legendBody = document.getElementById('legendBody');
+        const numInput = document.getElementById('numInput');
+        const rangeSlider = document.getElementById('rangeSlider');
+        const sliderMidLabel = document.getElementById('sliderMidLabel');
+        const relativeMultiplierBadge = document.getElementById('relativeMultiplierBadge');
+        const refStandardBadge = document.getElementById('refStandardBadge');
+        const promptRefValue = document.getElementById('promptRefValue');
+        const legendRefArea = document.getElementById('legendRefArea');
+        const legendTraceSwatch = document.getElementById('legendTraceSwatch');
+        const legendTraceLabel = document.getElementById('legendTraceLabel');
+
+        const submitGuessBtn = document.getElementById('submitGuessBtn');
+        const nextPeakBtn = document.getElementById('nextPeakBtn');
+        const nextPeakBtnLabel = document.getElementById('nextPeakBtnLabel');
+        const ppeLockNotice = document.getElementById('ppeLockNotice');
+        const inlineOpenManualBtn = document.getElementById('inlineOpenManualBtn');
+        const standbyOverlay = document.getElementById('standbyOverlay');
+        const standbyCard = document.getElementById('standbyCard');
+        const standbyIcon = document.getElementById('standbyIcon');
+        const standbyTitle = document.getElementById('standbyTitle');
+        const standbyDesc = document.getElementById('standbyDesc');
+        const standbyOpenProtocolBtn = document.getElementById('standbyOpenProtocolBtn');
+        const resultCard = document.getElementById('resultCard');
+        const resUserGuess = document.getElementById('resUserGuess');
+        const resTrueArea = document.getElementById('resTrueArea');
+        const resErrorPct = document.getElementById('resErrorPct');
+        const resRoundScore = document.getElementById('resRoundScore');
+        const feedbackNarrative = document.getElementById('feedbackNarrative');
+        const gradeBadge = document.getElementById('gradeBadge');
+        const scoreDisplay = document.getElementById('scoreDisplay');
+        const roundDisplay = document.getElementById('roundDisplay');
+        const streakDisplay = document.getElementById('streakDisplay');
+        const avgErrorDisplay = document.getElementById('avgErrorDisplay');
+        const highScoreDisplay = document.getElementById('highScoreDisplay');
+        const ratingBadge = document.getElementById('ratingBadge');
+        const difficultySelect = document.getElementById('difficultySelect');
+        const toggleCollectorBtn = document.getElementById('toggleCollectorBtn');
+        const channelIndicator = document.getElementById('channelIndicator');
+        const evalStatusBadge = document.getElementById('evalStatusBadge');
+        const baselineNoiseStat = document.getElementById('baselineNoiseStat');
+
+        // Theme & Utility Elements
+        const themeToggleBtn = document.getElementById('themeToggleBtn');
+        const themeIcon = document.getElementById('themeIcon');
+        const themeLabel = document.getElementById('themeLabel');
+        const soundToggleBtn = document.getElementById('soundToggleBtn');
+        const soundLabel = document.getElementById('soundLabel');
+        const soundIcon = document.getElementById('soundIcon');
+        const resetRecordBtn = document.getElementById('resetRecordBtn');
+
+        // Modal Elements
+        const gameOverModal = document.getElementById('gameOverModal');
+        const modalPlayAgainBtn = document.getElementById('modalPlayAgainBtn');
+        const modalCloseBtn = document.getElementById('modalCloseBtn');
+        const manualModal = document.getElementById('manualModal');
+        const openManualBtn = document.getElementById('openManualBtn');
+        const closeManualBtn = document.getElementById('closeManualBtn');
+        const closeManualBtn2 = document.getElementById('closeManualBtn2');
+
+        // Tooltip Elements
+        const canvasTooltip = document.getElementById('canvasTooltip');
+        const tooltipRt = document.getElementById('tooltipRt');
+        const tooltipInt = document.getElementById('tooltipInt');
+
+        // Apply Theme (Light or Dark Mode)
+        function applyTheme(themeName) {
+            state.theme = themeName;
+            document.documentElement.setAttribute('data-theme', themeName);
+            localStorage.setItem('irms_theme', themeName);
+
+            if (themeName === 'light') {
+                themeIcon.textContent = '🌙';
+                themeLabel.textContent = 'Dark Mode';
+            } else {
+                themeIcon.textContent = '☀️';
+                themeLabel.textContent = 'Light Mode';
+            }
+            drawChromatogram();
+        }
+
+        // Helper: Exponentially Modified Gaussian (EMG)
+        function emgFunction(t, h, t0, sigma, tau) {
+            if (tau <= 0.001) {
+                const z = (t - t0) / sigma;
+                return h * Math.exp(-0.5 * z * z);
+            }
+            const expPart = Math.exp((sigma * sigma) / (2 * tau * tau) - (t - t0) / tau);
+            const z = ((t - t0) / sigma) - (sigma / tau);
+            const erfVal = erf(z / Math.SQRT2);
+            return (h * sigma / tau) * Math.sqrt(Math.PI / 2) * expPart * (1 + erfVal) * 0.5;
+        }
+
+        // Standard approximation for Gauss Error Function erf(x)
+        function erf(x) {
+            const sign = (x >= 0) ? 1 : -1;
+            x = Math.abs(x);
+            const a1 =  0.254829592;
+            const a2 = -0.284496736;
+            const a3 =  1.421413741;
+            const a4 = -1.453152027;
+            const a5 =  1.061405429;
+            const p  =  0.3275911;
+
+            const t = 1.0 / (1.0 + p * x);
+            const y = 1.0 - (((((a5 * t + a4) * t) + a3) * t + a2) * t + a1) * t * Math.exp(-x * x);
+            return sign * y;
+        }
+
+        // Determine Rank Tier from Score or Error Percentage (5-tier progression)
+        // Tier 1: GCSE Chemistry Student -> Tier 2: A-Level Chemistry Student -> Tier 3: Uni Student -> Tier 4: Junior Laboratory Technician -> Tier 5: Lab Manager
+        function getSessionRankInfo(score) {
+            if (score >= 480) {
+                return {
+                    title: "Lab Manager",
+                    badgeClass: "bg-emerald-500/15 text-emerald-400 border-emerald-500/40"
+                };
+            } else if (score >= 360) {
+                return {
+                    title: "Junior Laboratory Technician",
+                    badgeClass: "bg-cyan-500/15 text-cyan-400 border-cyan-500/40"
+                };
+            } else if (score >= 240) {
+                return {
+                    title: "Uni Student",
+                    badgeClass: "bg-sky-500/15 text-sky-400 border-sky-500/40"
+                };
+            } else if (score >= 120) {
+                return {
+                    title: "A-Level Chemistry Student",
+                    badgeClass: "bg-amber-500/15 text-amber-400 border-amber-500/40"
+                };
+            } else {
+                return {
+                    title: "GCSE Chemistry Student",
+                    badgeClass: "theme-control border"
+                };
+            }
+        }
+
+        // Generate flat detector background noise before the first sample is manually injected
+        function generateStandbyTrace() {
+            state.sampleInjected = false;
+            state.revealed = false;
+
+            const N = state.totalSeconds * state.sampleRate;
+            state.points = new Array(N);
+            state.baseline = new Array(N);
+
+            const dt = 1 / state.sampleRate;
+            const noiseAmp = 0.03;
+            baselineNoiseStat.textContent = `±0.02 V`;
+
+            for (let i = 0; i < N; i++) {
+                const t = i * dt;
+                const baseVal = 0.45 + Math.sin(t * 0.015) * 0.01;
+                state.baseline[i] = baseVal;
+                state.points[i] = baseVal + (Math.random() - 0.5) * noiseAmp;
+            }
+
+            resultCard.classList.add('hidden');
+            submitGuessBtn.disabled = true;
+            submitGuessBtn.classList.add('opacity-40');
+            numInput.disabled = true;
+            rangeSlider.disabled = true;
+
+            updateStandbyAndSafetyUI();
+            drawChromatogram();
+        }
+
+        // Synchronize Standby Overlay, Injection Button, and COSHH Sign-Off Lock
+        function updateStandbyAndSafetyUI() {
+            if (!state.sampleInjected) {
+                standbyOverlay.classList.remove('hidden');
+                nextPeakBtnLabel.textContent = 'INJECT FIRST SAMPLE (START RUN 1)';
+
+                if (!state.ppeVerified) {
+                    nextPeakBtn.disabled = true;
+                    ppeLockNotice.classList.remove('hidden');
+                    standbyCard.className = 'theme-overlay border-2 border-dashed border-amber-500/40 rounded-2xl p-5 max-w-md w-full text-center shadow-2xl backdrop-blur-md pointer-events-auto space-y-3';
+                    standbyIcon.textContent = '⚠️';
+                    standbyIcon.className = 'w-11 h-11 rounded-xl bg-amber-500/15 border border-amber-500/40 theme-text-amber flex items-center justify-center mx-auto text-xl font-mono';
+                    standbyTitle.textContent = 'Instrument Standby · Safety Interlock Active';
+                    standbyDesc.innerHTML = 'Mandatory <strong>UK COSHH Risk Assessment & PPE Sign-Off</strong> is required before opening the reference gas valves or injecting your first sample.';
+                    standbyOpenProtocolBtn.textContent = 'Open Lab Protocol & Sign Off PPE';
+                    standbyOpenProtocolBtn.className = 'px-3.5 py-2 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-mono font-bold text-xs transition shadow';
+                    evalStatusBadge.textContent = 'Safety Interlock: Sign off COSHH & PPE in Lab Protocol to enable injection';
+                    evalStatusBadge.className = 'theme-text-amber font-mono text-xs';
+                } else {
+                    nextPeakBtn.disabled = false;
+                    ppeLockNotice.classList.add('hidden');
+                    standbyCard.className = 'theme-overlay border-2 border-dashed border-emerald-500/40 rounded-2xl p-5 max-w-md w-full text-center shadow-2xl backdrop-blur-md pointer-events-auto space-y-3';
+                    standbyIcon.textContent = '✓';
+                    standbyIcon.className = 'w-11 h-11 rounded-xl bg-emerald-500/15 border border-emerald-500/40 theme-text-emerald flex items-center justify-center mx-auto text-xl font-mono font-bold';
+                    standbyTitle.textContent = 'COSHH & PPE Verified · Ready for Injection';
+                    standbyDesc.innerHTML = 'Safety interlock cleared. Press <strong>INJECT FIRST SAMPLE</strong> in the Estimation Console (or click below) to manually inject Run 1.';
+                    standbyOpenProtocolBtn.textContent = 'Inject First Sample (Start Run 1) ⏭';
+                    standbyOpenProtocolBtn.className = 'px-3.5 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-mono font-bold text-xs transition shadow';
+                    evalStatusBadge.textContent = 'COSHH Verified ✓ — Press "Inject First Sample" to begin Run 1';
+                    evalStatusBadge.className = 'theme-text-emerald font-mono text-xs font-semibold';
+                }
+            } else {
+                standbyOverlay.classList.add('hidden');
+                nextPeakBtnLabel.textContent = state.round >= state.maxRounds ? 'FINISH ACQUISITION SEQUENCE' : 'INJECT NEXT SAMPLE (RUN)';
+                if (!state.ppeVerified) {
+                    nextPeakBtn.disabled = true;
+                    ppeLockNotice.classList.remove('hidden');
+                } else {
+                    ppeLockNotice.classList.add('hidden');
+                    nextPeakBtn.disabled = !state.revealed;
+                }
+            }
+        }
+
+        // Generate synthetic chromatogram run with specific V/ms areas
+        function generateChromatogram() {
+            state.sampleInjected = true;
+            state.revealed = false;
+            standbyOverlay.classList.add('hidden');
+            evalStatusBadge.textContent = 'Acquiring signal... Estimate sample area in V/ms';
+            evalStatusBadge.className = 'theme-text-cyan font-mono text-xs';
+            resultCard.classList.add('hidden');
+            submitGuessBtn.disabled = false;
+            submitGuessBtn.classList.remove('opacity-40');
+            numInput.disabled = false;
+            rangeSlider.disabled = false;
+            nextPeakBtn.disabled = true;
+            nextPeakBtnLabel.textContent = state.round >= state.maxRounds ? 'FINISH ACQUISITION SEQUENCE' : 'INJECT NEXT SAMPLE (RUN)';
+
+            const N = state.totalSeconds * state.sampleRate;
+            state.points = new Array(N);
+            state.baseline = new Array(N);
+
+            // Generate a clean physical Reference Gas Pulse area in V/ms (e.g., 25.0 to 60.0 V/ms in 0.5 steps)
+            const refSteps = Math.floor(Math.random() * 71); // 0..70
+            const assignedRefAreaVms = 25.0 + refSteps * 0.5; // e.g. 40.0 V/ms
+
+            // Set Ref gas waveform parameters in Volts (V)
+            state.refPeak.rt = 85 + Math.random() * 20; // 85 - 105s
+            state.refPeak.sigma = 10;
+            // Scale Ref peak height (around 3.0 V to 6.5 V) proportional to its V/ms area
+            state.refPeak.height = (assignedRefAreaVms / 40.0) * 4.5;
+            state.refPeak.tail = 0.001;
+
+            // Generate Randomized Sample Peak Ratio (0.30x to 3.10x of Ref area)
+            const targetRatio = 0.30 + Math.random() * 2.80;
+
+            // Decompose ratio into Height vs Width variability
+            let widthMod = 0.65 + Math.random() * 0.90;
+            if (state.difficulty === 1) {
+                widthMod = 0.80 + Math.random() * 0.40;
+            }
+            
+            const targetSampleSigma = state.refPeak.sigma * widthMod;
+            const targetSampleHeight = (state.refPeak.height * targetRatio) / widthMod;
+
+            state.samplePeak.rt = state.refPeak.rt + 115 + Math.random() * 65; // 200 - 290s
+            state.samplePeak.height = Math.max(0.8, targetSampleHeight);
+            state.samplePeak.sigma = targetSampleSigma;
+            
+            // Asymmetry / Tailing factor depending on difficulty
+            if (state.difficulty === 1) {
+                state.samplePeak.tail = 0.001; // ideal symmetric Gaussian
+            } else if (state.difficulty === 2) {
+                state.samplePeak.tail = 2.0 + Math.random() * 4.0; // moderate chromatographic tailing
+            } else {
+                state.samplePeak.tail = 4.0 + Math.random() * 7.0; // heavy tailing
+                if (Math.random() > 0.5) {
+                    state.samplePeak.rt = state.refPeak.rt + 75 + Math.random() * 20;
+                }
+            }
+
+            // Baseline drift & noise profile (in Volts)
+            const driftSlope = (state.difficulty >= 2) ? (Math.random() - 0.45) * 0.002 : 0.0001;
+            const noiseAmp = (state.difficulty === 1) ? 0.015 : (state.difficulty === 2 ? 0.04 : 0.09);
+            baselineNoiseStat.textContent = `±${(noiseAmp * 0.7).toFixed(2)} V`;
+
+            let rawRefIntegral = 0;
+            let rawSampleIntegral = 0;
+            const dt = 1 / state.sampleRate;
+
+            for (let i = 0; i < N; i++) {
+                const t = i * dt;
+                const baseVal = 0.45 + (driftSlope * t) + (Math.sin(t * 0.02) * (state.difficulty === 3 ? 0.08 : 0.01));
+                state.baseline[i] = baseVal;
+
+                const refSignal = emgFunction(t, state.refPeak.height, state.refPeak.rt, state.refPeak.sigma, 0.001);
+                const sampleSignal = emgFunction(t, state.samplePeak.height, state.samplePeak.rt, state.samplePeak.sigma, state.samplePeak.tail);
+
+                const noise = (Math.random() - 0.5) * noiseAmp;
+                state.points[i] = baseVal + refSignal + sampleSignal + noise;
+
+                rawRefIntegral += refSignal * dt;
+                rawSampleIntegral += sampleSignal * dt;
+            }
+
+            // Set specific physical V/ms areas
+            state.refPeak.area = assignedRefAreaVms;
+            state.samplePeak.area = Number(((rawSampleIntegral / rawRefIntegral) * assignedRefAreaVms).toFixed(1));
+
+            // Update UI displays with the new Ref Peak V/ms value
+            const refText = `${state.refPeak.area.toFixed(1)} V/ms`;
+            refStandardBadge.textContent = refText;
+            promptRefValue.textContent = refText;
+            legendRefArea.textContent = refText;
+
+            // Set default player input to 1.0x Reference Peak (in V/ms)
+            numInput.value = state.refPeak.area.toFixed(1);
+            rangeSlider.value = state.refPeak.area.toFixed(1);
+            sliderMidLabel.textContent = `${state.refPeak.area.toFixed(1)} V/ms (1×)`;
+            updateMultiplierBadge();
+
+            drawChromatogram();
+        }
+
+        // Resize Canvas dynamically
+        function resizeCanvas() {
+            const rect = canvas.parentElement.getBoundingClientRect();
+            canvas.width = rect.width * window.devicePixelRatio;
+            canvas.height = rect.height * window.devicePixelRatio;
+            clampLegendPosition();
+            drawChromatogram();
+        }
+
+        window.addEventListener('resize', resizeCanvas);
+
+        // Core Drawing Function
+        function drawChromatogram() {
+            if (!canvas.width || !canvas.height || state.points.length === 0) return;
+            const w = canvas.width;
+            const h = canvas.height;
+            const dpr = window.devicePixelRatio || 1;
+            const isLight = state.theme === 'light';
+
+            ctx.save();
+            ctx.clearRect(0, 0, w, h);
+
+            // CRITICAL UPDATE 1: Increased Left Margin (82px) so rotated Y-axis label and Y-tick numbers never overlap
+            const padLeft = 82 * dpr;
+            const padRight = 30 * dpr;
+            const padTop = 32 * dpr;
+            const padBottom = 46 * dpr;
+
+            const plotW = w - padLeft - padRight;
+            const plotH = h - padTop - padBottom;
+
+            // Maximum signal scale calculation (in Volts)
+            let maxSignal = 6.0;
+            for (let i = 0; i < state.points.length; i++) {
+                if (state.points[i] > maxSignal) maxSignal = state.points[i];
+            }
+            maxSignal = Math.ceil(maxSignal * 1.18);
+            if (maxSignal % 2 !== 0) maxSignal += 1;
+
+            // Coordinate conversion helpers
+            const getX = (t) => padLeft + (t / state.totalSeconds) * plotW;
+            const getY = (val) => padTop + plotH - (val / maxSignal) * plotH;
+
+            // 1. Draw Grid Lines & Tick Labels (Adaptive to Light/Dark Mode)
+            ctx.lineWidth = 1 * dpr;
+            ctx.strokeStyle = isLight ? '#e2e8f0' : '#1e293b';
+            ctx.fillStyle = isLight ? '#475569' : '#64748b';
+            ctx.font = `${10.5 * dpr}px 'JetBrains Mono', monospace`;
+            
+            // Y-Axis Horizontal Grid & Ticks right-aligned at padLeft - 10 (72px)
+            ctx.textAlign = 'right';
+            ctx.textBaseline = 'middle';
+            const yStep = maxSignal <= 8 ? 1.0 : (maxSignal <= 16 ? 2.0 : 4.0);
+            for (let v = 0; v <= maxSignal + 0.001; v += yStep) {
+                const yPos = getY(v);
+                ctx.beginPath();
+                ctx.moveTo(padLeft, yPos);
+                ctx.lineTo(w - padRight, yPos);
+                ctx.stroke();
+
+                ctx.fillText(`${v.toFixed(1)} V`, padLeft - (10 * dpr), yPos);
+            }
+
+            // X-Axis Vertical Grid & Ticks (Retention Time in seconds)
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'top';
+            for (let t = 0; t <= state.totalSeconds; t += 50) {
+                const xPos = getX(t);
+                ctx.beginPath();
+                ctx.moveTo(xPos, padTop);
+                ctx.lineTo(xPos, padTop + plotH);
+                ctx.stroke();
+
+                ctx.fillText(`${t}s`, xPos, padTop + plotH + (8 * dpr));
+            }
+
+            // Axis Titles
+            ctx.save();
+            ctx.fillStyle = isLight ? '#334155' : '#94a3b8';
+            ctx.font = `600 ${11 * dpr}px 'JetBrains Mono', monospace`;
+            ctx.textAlign = 'center';
+            ctx.fillText("Retention Time (s)", padLeft + plotW / 2, padTop + plotH + (26 * dpr));
+            
+            // Rotated Y-Axis Title placed cleanly at x = 20 * dpr (52px away from tick numbers at 72 * dpr)
+            ctx.translate(20 * dpr, padTop + plotH / 2);
+            ctx.rotate(-Math.PI / 2);
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText("Beam Intensity (V)", 0, 0);
+            ctx.restore();
+
+            // 2. If REVEALED: Draw Integrated Shaded Baselines & Areas
+            if (state.revealed && state.sampleInjected) {
+                drawIntegrationRegion(getX, getY, 1 / state.sampleRate, dpr, isLight);
+            }
+
+            // 3. Draw Peak Reference Bounding Guidance Box & Sample Peak Labels only after a sample has been injected
+            if (state.sampleInjected) {
+                const refStartT = state.refPeak.rt - (state.refPeak.sigma * 3.2);
+                const refEndT = state.refPeak.rt + (state.refPeak.sigma * 3.2);
+                const refX1 = getX(Math.max(0, refStartT));
+                const refX2 = getX(refEndT);
+
+                if (state.legendLayers.ref) {
+                    ctx.fillStyle = isLight ? 'rgba(6, 182, 212, 0.07)' : 'rgba(6, 182, 212, 0.04)';
+                    ctx.fillRect(refX1, padTop, refX2 - refX1, plotH);
+                    ctx.strokeStyle = isLight ? 'rgba(8, 145, 178, 0.45)' : 'rgba(6, 182, 212, 0.4)';
+                    ctx.setLineDash([4 * dpr, 4 * dpr]);
+                    ctx.strokeRect(refX1, padTop, refX2 - refX1, plotH);
+                    ctx.setLineDash([]);
+
+                    // Ref Peak Label (Reported in specific V/ms)
+                    ctx.fillStyle = isLight ? '#0891b2' : '#06b6d4';
+                    ctx.font = `bold ${10.5 * dpr}px 'JetBrains Mono', monospace`;
+                    ctx.textAlign = 'center';
+                    ctx.fillText(`REF: ${state.refPeak.area.toFixed(1)} V/ms`, (refX1 + refX2) / 2, padTop + (12 * dpr));
+                }
+
+                // Sample Peak Marker Label (Reported in specific V/ms when revealed)
+                const sampleX = getX(state.samplePeak.rt);
+                ctx.font = `bold ${10.5 * dpr}px 'JetBrains Mono', monospace`;
+                ctx.textAlign = 'center';
+                ctx.fillStyle = state.revealed ? (isLight ? '#059669' : '#10b981') : (isLight ? '#d97706' : '#f59e0b');
+                ctx.fillText(
+                    state.revealed ? `SAMPLE: ${state.samplePeak.area.toFixed(1)} V/ms` : "TARGET SAMPLE (? V/ms)",
+                    sampleX,
+                    padTop + (12 * dpr)
+                );
+            }
+
+            // 4. Draw Baseline Estimate Trace (if Baseline layer is active)
+            if (state.legendLayers.baseline) {
+                ctx.beginPath();
+                ctx.strokeStyle = isLight ? 'rgba(100, 116, 139, 0.55)' : 'rgba(148, 163, 184, 0.45)';
+                ctx.lineWidth = 1.2 * dpr;
+                ctx.setLineDash([5 * dpr, 4 * dpr]);
+                for (let i = 0; i < state.baseline.length; i++) {
+                    const t = i / state.sampleRate;
+                    const x = getX(t);
+                    const y = getY(state.baseline[i]);
+                    if (i === 0) ctx.moveTo(x, y);
+                    else ctx.lineTo(x, y);
+                }
+                ctx.stroke();
+                ctx.setLineDash([]);
+            }
+
+            // 5. Draw Main Chromatographic Trace (Faraday Cup Signal) (if Trace layer is active)
+            if (state.legendLayers.trace) {
+                ctx.beginPath();
+                const traceColor = state.collectorMode === 'major'
+                    ? (isLight ? '#0284c7' : '#38bdf8')
+                    : (isLight ? '#7c3aed' : '#a78bfa');
+                ctx.strokeStyle = traceColor;
+                ctx.lineWidth = 2.1 * dpr;
+                ctx.lineJoin = 'round';
+                ctx.lineCap = 'round';
+
+                for (let i = 0; i < state.points.length; i++) {
+                    const t = i / state.sampleRate;
+                    const x = getX(t);
+                    const y = getY(state.points[i]);
+                    if (i === 0) ctx.moveTo(x, y);
+                    else ctx.lineTo(x, y);
+                }
+                ctx.stroke();
+
+                // Subtle glow on dark mode oscilloscope
+                if (!isLight) {
+                    ctx.shadowColor = state.collectorMode === 'major' ? 'rgba(56, 189, 248, 0.4)' : 'rgba(167, 139, 250, 0.4)';
+                    ctx.shadowBlur = 8 * dpr;
+                    ctx.stroke();
+                    ctx.shadowBlur = 0;
+                }
+            }
+
+            ctx.restore();
+        }
+
+        // Draw trapezoidal integration shaded fills upon evaluation
+        function drawIntegrationRegion(getX, getY, dt, dpr, isLight) {
+            const N = state.points.length;
+
+            // Shade Ref Gas Integration
+            ctx.save();
+            ctx.beginPath();
+            let first = true;
+            const refT1 = state.refPeak.rt - 3.5 * state.refPeak.sigma;
+            const refT2 = state.refPeak.rt + 3.5 * state.refPeak.sigma;
+            
+            for (let i = 0; i < N; i++) {
+                const t = i * dt;
+                if (t >= refT1 && t <= refT2) {
+                    const x = getX(t);
+                    const y = getY(state.points[i]);
+                    if (first) {
+                        ctx.moveTo(x, getY(state.baseline[i]));
+                        ctx.lineTo(x, y);
+                        first = false;
+                    } else {
+                        ctx.lineTo(x, y);
+                    }
+                }
+            }
+            for (let i = N - 1; i >= 0; i--) {
+                const t = i * dt;
+                if (t >= refT1 && t <= refT2) {
+                    ctx.lineTo(getX(t), getY(state.baseline[i]));
+                }
+            }
+            ctx.closePath();
+            ctx.fillStyle = isLight ? 'rgba(6, 182, 212, 0.25)' : 'rgba(6, 182, 212, 0.35)';
+            ctx.fill();
+            ctx.strokeStyle = '#06b6d4';
+            ctx.lineWidth = 1.5 * dpr;
+            ctx.stroke();
+
+            // Shade Sample Peak Integration
+            ctx.beginPath();
+            first = true;
+            const sampT1 = state.samplePeak.rt - 3.5 * state.samplePeak.sigma;
+            const sampT2 = state.samplePeak.rt + 4.5 * (state.samplePeak.sigma + state.samplePeak.tail * 2.5);
+            
+            for (let i = 0; i < N; i++) {
+                const t = i * dt;
+                if (t >= sampT1 && t <= sampT2) {
+                    const x = getX(t);
+                    const y = getY(state.points[i]);
+                    if (first) {
+                        ctx.moveTo(x, getY(state.baseline[i]));
+                        ctx.lineTo(x, y);
+                        first = false;
+                    } else {
+                        ctx.lineTo(x, y);
+                    }
+                }
+            }
+            for (let i = N - 1; i >= 0; i--) {
+                const t = i * dt;
+                if (t >= sampT1 && t <= sampT2) {
+                    ctx.lineTo(getX(t), getY(state.baseline[i]));
+                }
+            }
+            ctx.closePath();
+            ctx.fillStyle = isLight ? 'rgba(16, 185, 129, 0.25)' : 'rgba(16, 185, 129, 0.35)';
+            ctx.fill();
+            ctx.strokeStyle = '#10b981';
+            ctx.lineWidth = 1.5 * dpr;
+            ctx.stroke();
+
+            ctx.restore();
+        }
+
+        // Handle Guess Evaluation in V/ms with the 5 new Chemistry/Lab Rank Tiers
+        function submitGuess() {
+            if (state.revealed) return;
+            sfx.playClick();
+
+            const guessVms = parseFloat(numInput.value);
+            if (isNaN(guessVms) || guessVms <= 0) return;
+
+            const actualVms = state.samplePeak.area;
+            const absDiff = Math.abs(guessVms - actualVms);
+            const errPercent = (absDiff / actualVms) * 100;
+
+            // Calibrated scoring formula
+            const penaltyFactor = 3.2;
+            let roundPoints = Math.max(0, Math.round(100 - (errPercent * penaltyFactor)));
+
+            // 5-Tier Rank Evaluation:
+            // GCSE Chemistry Student -> A-Level Chemistry Student -> Uni Student -> Junior Laboratory Technician -> Lab Manager
+            let feedback = "";
+            let grade = "";
+            let gradeClass = "";
+
+            if (errPercent <= 2.0) {
+                state.streak++;
+                roundPoints = Math.round(roundPoints * 1.5); // 1.5x Lab Manager bonus
+                feedback = `Lab Manager excellence! Your estimate (${guessVms.toFixed(1)} V/ms) was within ${errPercent.toFixed(2)}% of the true ${actualVms.toFixed(1)} V/ms peak area. Zero source linearity bias!`;
+                grade = "Lab Manager ★★★";
+                gradeClass = "bg-emerald-500/15 theme-text-emerald border-emerald-500/40";
+                sfx.playSuccess();
+            } else if (errPercent <= 5.0) {
+                state.streak++;
+                roundPoints = Math.round(roundPoints * 1.2); // 1.2x Technician bonus
+                feedback = `Junior Laboratory Technician precision! Within the ±5% continuous-flow IRMS quality threshold (${errPercent.toFixed(2)}% error). Ready for isotope ratio reporting.`;
+                grade = "Junior Laboratory Technician ★★";
+                gradeClass = "bg-cyan-500/15 theme-text-cyan border-cyan-500/40";
+                sfx.playSuccess();
+            } else if (errPercent <= 12.0) {
+                state.streak = 0;
+                feedback = `Uni Student level integration (${errPercent.toFixed(2)}% error). Good visual intuition for peak geometry, though slightly outside strict analytical QA tolerances.`;
+                grade = "Uni Student ★";
+                gradeClass = "bg-sky-500/15 text-sky-400 border-sky-500/40";
+                sfx.playSuccess();
+            } else if (errPercent <= 20.0) {
+                state.streak = 0;
+                feedback = `A-Level Chemistry Student estimate (${errPercent.toFixed(2)}% error). Watch how peak tailing and FWHM width alter V/ms area compared to the ${state.refPeak.area.toFixed(1)} V/ms reference.`;
+                grade = "A-Level Chemistry Student";
+                gradeClass = "bg-amber-500/15 theme-text-amber border-amber-500/40";
+                sfx.playWarning();
+            } else {
+                state.streak = 0;
+                roundPoints = Math.max(0, roundPoints);
+                feedback = `GCSE Chemistry Student tier (${errPercent.toFixed(1)}% error). Remember to compare both peak height (V) and peak width against the ${state.refPeak.area.toFixed(1)} V/ms reference pulse!`;
+                grade = "GCSE Chemistry Student";
+                gradeClass = "bg-rose-500/15 text-rose-400 border-rose-500/40";
+                sfx.playWarning();
+            }
+
+            // Update state
+            state.score += roundPoints;
+            state.errorHistory.push(errPercent);
+            state.revealed = true;
+
+            if (state.score > state.highScore) {
+                state.highScore = state.score;
+                localStorage.setItem('irms_highscore', state.highScore.toString());
+            }
+
+            // Update Result Audit Card in V/ms
+            const guessRatio = (guessVms / state.refPeak.area).toFixed(2);
+            const actualRatio = (actualVms / state.refPeak.area).toFixed(2);
+
+            resUserGuess.textContent = `${guessVms.toFixed(1)} V/ms (${guessRatio}×)`;
+            resTrueArea.textContent = `${actualVms.toFixed(1)} V/ms (${actualRatio}×)`;
+            resErrorPct.textContent = `${errPercent.toFixed(2)}%`;
+            resRoundScore.textContent = `+${roundPoints} pts`;
+            feedbackNarrative.textContent = feedback;
+            gradeBadge.textContent = grade;
+            gradeBadge.className = `text-xs font-mono font-bold px-2.5 py-0.5 rounded border ${gradeClass}`;
+
+            resultCard.classList.remove('hidden');
+            submitGuessBtn.disabled = true;
+            submitGuessBtn.classList.add('opacity-40');
+            nextPeakBtn.disabled = false;
+
+            updateScoreboards();
+            drawChromatogram();
+
+            evalStatusBadge.textContent = `Integrated: ${actualVms.toFixed(1)} V/ms (Error ${errPercent.toFixed(2)}%)`;
+            evalStatusBadge.className = errPercent <= 5 ? 'theme-text-emerald font-mono text-xs font-semibold' : 'theme-text-amber font-mono text-xs font-semibold';
+        }
+
+        function updateScoreboards() {
+            scoreDisplay.textContent = state.score;
+            roundDisplay.textContent = state.round;
+            streakDisplay.textContent = state.streak;
+            highScoreDisplay.textContent = state.highScore;
+
+            if (state.errorHistory.length > 0) {
+                const sum = state.errorHistory.reduce((a, b) => a + b, 0);
+                const avg = (sum / state.errorHistory.length).toFixed(1);
+                avgErrorDisplay.textContent = avg;
+            } else {
+                avgErrorDisplay.textContent = "--";
+            }
+
+            // Update 5-Tier Career Rank Badge on Scoreboard
+            const rankInfo = getSessionRankInfo(state.score);
+            ratingBadge.textContent = rankInfo.title;
+            ratingBadge.className = `text-[11px] font-mono font-semibold px-2 py-0.5 rounded border ${rankInfo.badgeClass}`;
+        }
+
+        function nextRound() {
+            if (!state.ppeVerified) {
+                sfx.playWarning();
+                manualModal.classList.remove('hidden');
+                return;
+            }
+
+            sfx.playClick();
+
+            // Manual injection of the very first sample when in standby mode
+            if (!state.sampleInjected) {
+                state.round = 1;
+                roundDisplay.textContent = state.round;
+                generateChromatogram();
+                return;
+            }
+
+            if (state.round >= state.maxRounds) {
+                showGameOver();
+                return;
+            }
+
+            state.round++;
+            roundDisplay.textContent = state.round;
+            generateChromatogram();
+        }
+
+        function showGameOver() {
+            const sum = state.errorHistory.reduce((a, b) => a + b, 0);
+            const avg = state.errorHistory.length ? (sum / state.errorHistory.length).toFixed(1) : "0.0";
+            const rankInfo = getSessionRankInfo(state.score);
+
+            document.getElementById('modalFinalScore').textContent = `${state.score} pts`;
+            document.getElementById('modalFinalAvgErr').textContent = `${avg}%`;
+            document.getElementById('modalFinalStreak').textContent = state.streak;
+            document.getElementById('modalFinalRank').textContent = rankInfo.title;
+
+            gameOverModal.classList.remove('hidden');
+        }
+
+        function resetSession() {
+            state.round = 0;
+            state.score = 0;
+            state.streak = 0;
+            state.errorHistory = [];
+            gameOverModal.classList.add('hidden');
+            updateScoreboards();
+            generateStandbyTrace();
+        }
+
+        // Update Live Ratio Helper Badge when V/ms input changes
+        function updateMultiplierBadge() {
+            const val = parseFloat(numInput.value) || 0;
+            const ratio = val / (state.refPeak.area || 40.0);
+            relativeMultiplierBadge.textContent = `${ratio.toFixed(2)}× Ref`;
+        }
+
+        function syncFromNumber() {
+            let val = parseFloat(numInput.value);
+            if (isNaN(val)) val = state.refPeak.area;
+            rangeSlider.value = Math.min(180.0, Math.max(2.0, val));
+            updateMultiplierBadge();
+        }
+
+        function syncFromSlider() {
+            const val = parseFloat(rangeSlider.value);
+            numInput.value = val.toFixed(1);
+            updateMultiplierBadge();
+        }
+
+        // Event Listeners
+        numInput.addEventListener('input', syncFromNumber);
+        rangeSlider.addEventListener('input', syncFromSlider);
+
+        // Quick Ratio Preset Buttons calculate exact V/ms based on current Reference Peak
+        document.querySelectorAll('.preset-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                if (!state.sampleInjected) return;
+                const mult = parseFloat(e.currentTarget.dataset.mult);
+                const targetVms = Number((state.refPeak.area * mult).toFixed(1));
+                numInput.value = targetVms.toFixed(1);
+                rangeSlider.value = Math.min(180.0, Math.max(2.0, targetVms));
+                updateMultiplierBadge();
+                sfx.playClick();
+            });
+        });
+
+        submitGuessBtn.addEventListener('click', submitGuess);
+        nextPeakBtn.addEventListener('click', nextRound);
+
+        // Theme Toggle Listener
+        themeToggleBtn.addEventListener('click', () => {
+            sfx.playClick();
+            const nextTheme = state.theme === 'dark' ? 'light' : 'dark';
+            applyTheme(nextTheme);
+        });
+
+        difficultySelect.addEventListener('change', (e) => {
+            state.difficulty = parseInt(e.target.value, 10);
+            sfx.playClick();
+            if (state.sampleInjected) {
+                generateChromatogram();
+            } else {
+                generateStandbyTrace();
+            }
+        });
+
+        toggleCollectorBtn.addEventListener('click', () => {
+            sfx.playClick();
+            if (state.collectorMode === 'major') {
+                state.collectorMode = 'minor';
+                toggleCollectorBtn.textContent = 'Collector: m/z 45';
+                channelIndicator.textContent = 'm/z 45 (MINOR 1.1%)';
+                channelIndicator.className = 'text-purple-400 font-semibold tracking-wider';
+                legendTraceSwatch.className = 'w-3 h-0.5 bg-purple-400 inline-block shrink-0';
+                legendTraceLabel.textContent = 'm/z 45 Minor Ion Trace';
+            } else {
+                state.collectorMode = 'major';
+                toggleCollectorBtn.textContent = 'Collector: m/z 44';
+                channelIndicator.textContent = 'm/z 44 (MAJOR)';
+                channelIndicator.className = 'theme-text-cyan font-semibold tracking-wider';
+                legendTraceSwatch.className = 'w-3 h-0.5 bg-sky-400 inline-block shrink-0';
+                legendTraceLabel.textContent = 'm/z 44 Major Ion Trace';
+            }
+            drawChromatogram();
+        });
+
+        // Hover Tooltip over canvas for retention time (s) / beam voltage (V)
+        canvas.addEventListener('mousemove', (e) => {
+            if (legendDragState.dragging) {
+                canvasTooltip.classList.add('hidden');
+                return;
+            }
+            const rect = canvas.getBoundingClientRect();
+            const padLeft = 82;
+            const padRight = 30;
+            const plotW = rect.width - padLeft - padRight;
+            const mouseX = e.clientX - rect.left;
+            const mouseY = e.clientY - rect.top;
+
+            if (mouseX >= padLeft && mouseX <= rect.width - padRight) {
+                const fraction = (mouseX - padLeft) / plotW;
+                const rt = fraction * state.totalSeconds;
+                const idx = Math.min(state.points.length - 1, Math.max(0, Math.round(rt * state.sampleRate)));
+                const intensity = state.points[idx] || 0;
+
+                canvasTooltip.style.left = `${Math.min(rect.width - 135, mouseX + 14)}px`;
+                canvasTooltip.style.top = `${Math.max(12, mouseY - 32)}px`;
+                tooltipRt.textContent = rt.toFixed(1);
+                tooltipInt.textContent = intensity.toFixed(2);
+                canvasTooltip.classList.remove('hidden');
+            } else {
+                canvasTooltip.classList.add('hidden');
+            }
+        });
+
+        canvas.addEventListener('mouseleave', () => {
+            canvasTooltip.classList.add('hidden');
+        });
+
+        // Interactive & Draggable Signal Legend Logic (Mouse & Touch support)
+        const legendDragState = {
+            dragging: false,
+            startX: 0,
+            startY: 0,
+            initialLeft: 0,
+            initialTop: 0,
+            customPositioned: false
+        };
+
+        function clampLegendPosition() {
+            if (!legendDragState.customPositioned) return;
+            const containerRect = canvasContainer.getBoundingClientRect();
+            const boxRect = signalLegendBox.getBoundingClientRect();
+            const maxLeft = Math.max(8, containerRect.width - boxRect.width - 8);
+            const maxTop = Math.max(8, containerRect.height - boxRect.height - 8);
+            const currentLeft = parseFloat(signalLegendBox.style.left) || 8;
+            const currentTop = parseFloat(signalLegendBox.style.top) || 8;
+
+            signalLegendBox.style.left = `${Math.min(maxLeft, Math.max(8, currentLeft))}px`;
+            signalLegendBox.style.top = `${Math.min(maxTop, Math.max(8, currentTop))}px`;
+        }
+
+        function startLegendDrag(clientX, clientY) {
+            const containerRect = canvasContainer.getBoundingClientRect();
+            const boxRect = signalLegendBox.getBoundingClientRect();
+
+            legendDragState.dragging = true;
+            legendDragState.customPositioned = true;
+            legendDragState.startX = clientX;
+            legendDragState.startY = clientY;
+            legendDragState.initialLeft = boxRect.left - containerRect.left;
+            legendDragState.initialTop = boxRect.top - containerRect.top;
+
+            signalLegendBox.style.right = 'auto';
+            signalLegendBox.style.left = `${legendDragState.initialLeft}px`;
+            signalLegendBox.style.top = `${legendDragState.initialTop}px`;
+            signalLegendBox.classList.add('ring-1', 'ring-cyan-500/50');
+            canvasTooltip.classList.add('hidden');
+        }
+
+        function moveLegendDrag(clientX, clientY) {
+            if (!legendDragState.dragging) return;
+            const containerRect = canvasContainer.getBoundingClientRect();
+            const boxRect = signalLegendBox.getBoundingClientRect();
+
+            const dx = clientX - legendDragState.startX;
+            const dy = clientY - legendDragState.startY;
+
+            const maxLeft = Math.max(8, containerRect.width - boxRect.width - 8);
+            const maxTop = Math.max(8, containerRect.height - boxRect.height - 8);
+
+            const nextLeft = Math.min(maxLeft, Math.max(8, legendDragState.initialLeft + dx));
+            const nextTop = Math.min(maxTop, Math.max(8, legendDragState.initialTop + dy));
+
+            signalLegendBox.style.left = `${nextLeft}px`;
+            signalLegendBox.style.top = `${nextTop}px`;
+        }
+
+        function endLegendDrag() {
+            if (!legendDragState.dragging) return;
+            legendDragState.dragging = false;
+            signalLegendBox.classList.remove('ring-1', 'ring-cyan-500/50');
+        }
+
+        // Mouse Drag Events
+        legendDragHandle.addEventListener('mousedown', (e) => {
+            if (e.target.closest('#legendCollapseBtn')) return;
+            e.preventDefault();
+            startLegendDrag(e.clientX, e.clientY);
+        });
+
+        window.addEventListener('mousemove', (e) => {
+            if (legendDragState.dragging) {
+                moveLegendDrag(e.clientX, e.clientY);
+            }
+        });
+
+        window.addEventListener('mouseup', endLegendDrag);
+
+        // Touch Drag Events
+        legendDragHandle.addEventListener('touchstart', (e) => {
+            if (e.target.closest('#legendCollapseBtn')) return;
+            if (e.touches.length === 1) {
+                const touch = e.touches[0];
+                startLegendDrag(touch.clientX, touch.clientY);
+            }
+        }, { passive: true });
+
+        window.addEventListener('touchmove', (e) => {
+            if (legendDragState.dragging && e.touches.length === 1) {
+                e.preventDefault();
+                const touch = e.touches[0];
+                moveLegendDrag(touch.clientX, touch.clientY);
+            }
+        }, { passive: false });
+
+        window.addEventListener('touchend', endLegendDrag);
+
+        // Collapse / Expand Signal Legend Body
+        legendCollapseBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            sfx.playClick();
+            state.legendCollapsed = !state.legendCollapsed;
+            const isHidden = legendBody.classList.toggle('hidden', state.legendCollapsed);
+            legendCollapseBtn.textContent = isHidden ? '+' : '−';
+            clampLegendPosition();
+        });
+
+        // Toggle Individual Signal Legend Visibility Layers
+        document.querySelectorAll('.legend-toggle-row').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const layer = e.currentTarget.dataset.layer;
+                state.legendLayers[layer] = !state.legendLayers[layer];
+                const stateLabel = e.currentTarget.querySelector('.layer-state');
+                if (state.legendLayers[layer]) {
+                    stateLabel.textContent = 'ON';
+                    stateLabel.className = 'layer-state text-[9px] theme-text-emerald font-bold';
+                    e.currentTarget.classList.remove('opacity-45');
+                } else {
+                    stateLabel.textContent = 'OFF';
+                    stateLabel.className = 'layer-state text-[9px] theme-text-dim font-bold';
+                    e.currentTarget.classList.add('opacity-45');
+                }
+                sfx.playClick();
+                drawChromatogram();
+            });
+        });
+
+        // Modals & Protocol Lab Manual Toggles
+        openManualBtn.addEventListener('click', () => {
+            sfx.playClick();
+            manualModal.classList.remove('hidden');
+        });
+        closeManualBtn.addEventListener('click', () => manualModal.classList.add('hidden'));
+        closeManualBtn2.addEventListener('click', () => manualModal.classList.add('hidden'));
+
+        // UK COSHH Risk Assessment & PPE Compliance Sign-Off Logic
+        const headerPpeBadgeBtn = document.getElementById('headerPpeBadgeBtn');
+        const headerPpeDot = document.getElementById('headerPpeDot');
+        const headerPpeText = document.getElementById('headerPpeText');
+        const modalPpeStatusBadge = document.getElementById('modalPpeStatusBadge');
+        const togglePpeComplianceBtn = document.getElementById('togglePpeComplianceBtn');
+
+        function updatePpeComplianceUI() {
+            if (state.ppeVerified) {
+                headerPpeBadgeBtn.className = 'flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 theme-text-emerald font-semibold transition';
+                headerPpeDot.className = 'w-1.5 h-1.5 rounded-full bg-emerald-500';
+                headerPpeText.textContent = 'COSHH & PPE: Verified ✓';
+
+                modalPpeStatusBadge.textContent = 'COSHH & PPE: Verified ✓';
+                modalPpeStatusBadge.className = 'text-[11px] font-mono font-bold px-2.5 py-0.5 rounded bg-emerald-500/15 theme-text-emerald border border-emerald-500/40';
+
+                togglePpeComplianceBtn.textContent = '✓ COSHH Risk Assessment & PPE Logged (Click to Reset)';
+                togglePpeComplianceBtn.className = 'px-3 py-1.5 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/40 theme-text-emerald font-mono font-bold text-xs transition';
+            } else {
+                headerPpeBadgeBtn.className = 'flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/40 theme-text-amber font-semibold transition';
+                headerPpeDot.className = 'w-1.5 h-1.5 rounded-full bg-amber-500 animate-ping';
+                headerPpeText.textContent = 'COSHH & PPE: Pending Sign-Off';
+
+                modalPpeStatusBadge.textContent = 'Action Required: Sign Off PPE & RA';
+                modalPpeStatusBadge.className = 'text-[11px] font-mono font-bold px-2.5 py-0.5 rounded bg-amber-500/15 theme-text-amber border border-amber-500/40';
+
+                togglePpeComplianceBtn.textContent = 'Confirm COSHH Risk Assessment & PPE Compliance';
+                togglePpeComplianceBtn.className = 'px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-mono font-bold text-xs transition shadow';
+            }
+            updateStandbyAndSafetyUI();
+        }
+
+        if (headerPpeBadgeBtn) {
+            headerPpeBadgeBtn.addEventListener('click', () => {
+                sfx.playClick();
+                manualModal.classList.remove('hidden');
+            });
+        }
+
+        if (inlineOpenManualBtn) {
+            inlineOpenManualBtn.addEventListener('click', () => {
+                sfx.playClick();
+                manualModal.classList.remove('hidden');
+            });
+        }
+
+        if (standbyOpenProtocolBtn) {
+            standbyOpenProtocolBtn.addEventListener('click', () => {
+                if (!state.ppeVerified) {
+                    sfx.playClick();
+                    manualModal.classList.remove('hidden');
+                } else {
+                    nextRound();
+                }
+            });
+        }
+
+        if (togglePpeComplianceBtn) {
+            togglePpeComplianceBtn.addEventListener('click', () => {
+                state.ppeVerified = !state.ppeVerified;
+                if (state.ppeVerified) sfx.playSuccess();
+                else sfx.playWarning();
+                updatePpeComplianceUI();
+            });
+        }
+
+        modalPlayAgainBtn.addEventListener('click', resetSession);
+        modalCloseBtn.addEventListener('click', () => gameOverModal.classList.add('hidden'));
+
+        resetRecordBtn.addEventListener('click', () => {
+            localStorage.removeItem('irms_highscore');
+            state.highScore = 0;
+            updateScoreboards();
+            sfx.playClick();
+        });
+
+        soundToggleBtn.addEventListener('click', () => {
+            sfx.enabled = !sfx.enabled;
+            if (sfx.enabled) {
+                soundLabel.textContent = "SFX ON";
+                soundIcon.textContent = "🔊";
+                sfx.playClick();
+            } else {
+                soundLabel.textContent = "SFX OFF";
+                soundIcon.textContent = "🔇";
+            }
+        });
+
+        // Initial Boot: Start in Pre-Injection Vacuum Standby (No Sample Injected until COSHH/PPE signed off)
+        window.onload = function() {
+            applyTheme(state.theme);
+            updatePpeComplianceUI();
+            updateScoreboards();
+            resizeCanvas();
+            generateStandbyTrace();
+        };
+    </script>
+</body>
+</html>
